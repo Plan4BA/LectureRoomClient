@@ -24,6 +24,7 @@
 
 ESP8266WiFiMulti WiFiMulti;//WIFI
 
+
 void initWlan(char *ap, char *pw) 
 {
     WiFi.mode(WIFI_STA);
@@ -39,27 +40,33 @@ void reinitWlan(char *ap, char *pw)
 }
 
 
-void show(GxEPD_Class &display, const char now[50][3], const char next[50][3])
+void show(GxEPD_Class &display, const String now[3], const String next[3])
 {
     display.fillScreen(GxEPD_WHITE);
     display.setTextColor(GxEPD_BLACK);
     display.setFont(&FreeMono9pt7b);
     display.setRotation(1);
-    display.setCursor(0, 0);
-    if(now != NULL) {
-        int size = sizeof(now) / sizeof(now[0]);
-        for(int i = 0 ; i < size ; i++)  {
-            display.println(now[i]);
-        }
-    }
-
-    if(next != NULL) {
-        int size = sizeof(next) / sizeof(next[0]);
-        for(int i = 0 ; i < size ; i++)  {
-            display.println(next[i]);
-        }
-    }
+    display.setCursor(0, 20);
     
+    String leftPadding = "   ";
+    if(now != NULL) {
+        int size = 3; //sizeof(now);
+        Serial.printf("size now: (%d)\n", sizeof now);
+        for(int i = 0 ; i < size ; i++)  {
+            display.println(leftPadding+ now[i]);
+        }
+        display.drawBitmap(clockNow, 3, 3, 20, 20, GxEPD_BLACK);
+    }
+    display.setCursor(0, 85);
+    if(next != NULL) {
+        int size = 3;//sizeof(next);
+        Serial.printf("size: next (%d)\n", sizeof next);
+        for(int i = 0 ; i < size ; i++)  {
+            Serial.println(next[i]);
+            display.println(leftPadding + next[i]);
+        }
+        display.drawBitmap(clockNext, 3, 73, 20, 20, GxEPD_BLACK);
+    }
 	delay(3000);
     display.update();
     Serial.printf("Update\n");
@@ -76,32 +83,32 @@ void showDisplay(GxEPD_Class &display, const char *payload)
                     return;
                 }
                 Serial.println(payload);
-                char nowArr[50][3];
-                char nextArr[50][3];
+                String nowArr[3];
+                String nextArr[3];
                 if(!doc["now"].isNull())
                 {
-                    const char *time = doc["now"]["time"];
-                    const char *desc = doc["now"]["desc"];
-                    const char *instructor = doc["now"]["instructor"];
-                    Serial.printf("(%s, %s, %s)", time, desc, instructor);
-                    strcpy(nowArr[0], time);
-                    strcpy(nowArr[1], desc);
-                    strcpy(nowArr[2], instructor);
+                    const JsonVariant &now = doc["now"];
+                    const char *time = now["time"];
+                    const char *desc = now["desc"];
+                    const char *instructor = now["instructor"];
+                    nowArr[0] = time;
+                    nowArr[1] = desc;
+                    nowArr[2] = instructor;
                 }
                 if(!doc["next"].isNull())
                 {
-                    const char *time = doc["next"]["time"];
-                    const char *desc = doc["next"]["desc"];
-                    const char *instructor = doc["next"]["instructor"];
-                    Serial.printf("(%s, %s, %s)", time, desc, instructor);
-                    strcpy(nextArr[0], time);
-                    strcpy(nextArr[1], desc);
-                    strcpy(nextArr[2], instructor);
+                    const JsonVariant &next = doc["next"];
+                    const char *time = next["time"];
+                    const char *desc = next["desc"];
+                    const char *instructor = next["instructor"];
+                    nextArr[0] = time;
+                    nextArr[1] = desc;
+                    nextArr[2] = instructor;
                 }
                 show(display,nowArr, nextArr);
 }
 
-void doWithWifi(WiFiClient wiFiClient, GxEPD_Class &display, char *room, char *roompw)
+int doWithWifi(WiFiClient wiFiClient, GxEPD_Class &display, char *room, char *roompw)
 {
     HTTPClient http;
     Serial.print("[HTTP] begin...\n");
@@ -124,13 +131,16 @@ void doWithWifi(WiFiClient wiFiClient, GxEPD_Class &display, char *room, char *r
             if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY) {
                 const char *payload = http.getString().c_str();
                 showDisplay(display, payload);
+                return 0;
             }
         } else {
             Serial.printf("[HTTP] GET... failed, error: %s\n", http.errorToString(httpCode).c_str());
+            return -1;
         }
 
         http.end();
     } else {
         Serial.printf("[HTTP} Unable to connect\n");
+        return-1;
     }
 }
